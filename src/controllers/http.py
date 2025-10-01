@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, AnyUrl
+from pydantic import BaseModel, AnyUrl, Field
 from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 
 from infrastructure.config import settings
@@ -15,7 +15,11 @@ router = APIRouter()
 class InsertRequest(BaseModel):
     """Request model for inserting forecast data from a file URL."""
 
-    url: AnyUrl
+    url: AnyUrl = Field(
+        ...,
+        example="https://data.ecmwf.int/forecasts/{DATE}/{TIME}z/ifs/0p25/oper/{FILE}.grib2",
+        description="URL to GRIB2 file from ECMWF Open Data. Replace {DATE}, {TIME}, and {FILE} with actual values."
+    )
 
 
 @router.get("/health", status_code=HTTP_200_OK, summary="Health check", tags=["system"])
@@ -24,12 +28,15 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@router.post("/insert", status_code=HTTP_200_OK, summary="Parse file and insert to DB", tags=["ingest"])
+@router.post("/insert", status_code=HTTP_200_OK, summary="Parse file and insert to DB", tags=["usage"])
 def insert(payload: InsertRequest) -> dict:
     """Downloads a binary file by URL, parses the content, and inserts data into ClickHouse.
 
     - On parsing error returns 400 with details
     - On DB error returns 500 with details
+
+    **Example URL for ECMWF Open Data template:**
+    - `https://data.ecmwf.int/forecasts/20250930/12z/ifs/0p25/oper/20250930120000-15h-oper-fc.grib2`
     """
     # Determine file name as the last path segment of URL
     file_name = payload.url.path.split("/")[-1]
@@ -43,7 +50,7 @@ def insert(payload: InsertRequest) -> dict:
         parser = ParserService()
         dtos, parse_ms = parser.parse_file(local_path, file_name=file_name)
     except Exception as exc:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=f"Parsing error: {exc}") from exc
+        raise HTTPException(status_code=HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Parsing error: {exc}") from exc
 
     try:
         db = DatabaseService()
