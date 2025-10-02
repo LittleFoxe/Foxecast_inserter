@@ -1,4 +1,4 @@
-from services.parser_service import ParserService
+from src.services.parser_service import ParserService
 
 
 def test_parser_returns_complete_dto(tmp_path):

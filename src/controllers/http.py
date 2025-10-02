@@ -2,11 +2,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, AnyUrl, Field
 from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 
-from infrastructure.config import settings
-from services.parser_service import ParserService
-from services.db_service import DatabaseService
-from infrastructure.downloader import download_to_tempfile
-from metrics.metrics import file_download_seconds, file_size_bytes, network_bytes_total, parse_seconds, db_insert_seconds
+from src.infrastructure.config import settings
+from src.services.parser_service import ParserService
+from src.services.db_service import DatabaseService
+from src.infrastructure.downloader import download_to_tempfile
+from src.metrics.metrics import file_download_seconds, file_size_bytes, network_bytes_total, parse_seconds, db_insert_seconds
 
 
 router = APIRouter()
@@ -17,8 +17,10 @@ class InsertRequest(BaseModel):
 
     url: AnyUrl = Field(
         ...,
-        example="https://data.ecmwf.int/forecasts/{DATE}/{TIME}z/ifs/0p25/oper/{FILE}.grib2",
-        description="URL to GRIB2 file from ECMWF Open Data. Replace {DATE}, {TIME}, and {FILE} with actual values."
+        json_schema_extra={
+            "example": "https://data.ecmwf.int/forecasts/{DATE}/{TIME}z/ifs/0p25/oper/{FILE}.grib2",
+            "description": "URL to GRIB2 file from ECMWF Open Data. Replace {DATE}, {TIME}, and {FILE} with actual values."
+        }
     )
 
 

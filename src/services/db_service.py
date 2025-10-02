@@ -3,8 +3,8 @@ from typing import Iterable, List, Tuple
 
 from clickhouse_connect import get_client
 
-from domain.dto import ForecastDataDTO
-from infrastructure.config import settings
+from src.domain.dto import ForecastDataDTO
+from src.infrastructure.config import settings
 
 
 class DatabaseService:

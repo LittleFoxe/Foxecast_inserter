@@ -6,8 +6,8 @@ from typing import List, Tuple
 import numpy as np
 from earthkit.data import from_source
 
-from domain.dto import ForecastDataDTO
-from infrastructure.source_resolver import resolve_data_source
+from src.domain.dto import ForecastDataDTO
+from src.infrastructure.source_resolver import resolve_data_source
 
 
 class ParserService:
