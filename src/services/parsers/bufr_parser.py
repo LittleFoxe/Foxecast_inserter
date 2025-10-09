@@ -7,8 +7,11 @@ from typing import List
 import numpy as np
 from eccodes import (
     codes_bufr_new_from_file,
-    codes_bufr_decode_messages,
     codes_release,
+    codes_set,
+    codes_get,
+    codes_get_array,
+    codes_get_string  # Add this import if you need to get string values
 )
 
 from src.domain.dto import ForecastDataDTO
@@ -16,40 +19,74 @@ from src.infrastructure.source_resolver import resolve_data_source
 
 
 class BufrParser:
-    """Parser strategy for BUFR files using eccodes.
-
-    Note: BUFR is observation-oriented and often lacks gridded fields and
-    complete spatial grid metadata required for our DB schema. We attempt to
-    infer grid metadata if messages form a regular grid; otherwise, we raise.
-    """
+    """Parser strategy for BUFR files using eccodes."""
 
     def parse(self, local_path: str, file_name: str) -> List[ForecastDataDTO]:
         dtos: List[ForecastDataDTO] = []
 
         with open(local_path, "rb") as f:
             while True:
-                h = codes_bufr_new_from_file(f)
-                if h is None:
+                bufr_id = codes_bufr_new_from_file(f)
+                if bufr_id is None:
                     break
+                
                 try:
-                    messages = codes_bufr_decode_messages(h)
-                finally:
-                    codes_release(h)
+                    # Unpack the BUFR message data
+                    codes_set(bufr_id, "unpack", 1)
+                    
+                    # Extract time information using individual keys
+                    # Using get methods with defaults if keys are missing
+                    try:
+                        year = codes_get(bufr_id, "typicalYear")
+                    except:
+                        year = datetime.now(datetime.timezone.utc).year
+                    
+                    try:
+                        month = codes_get(bufr_id, "typicalMonth")
+                    except:
+                        month = datetime.now(datetime.timezone.utc).month
+                    
+                    try:
+                        day = codes_get(bufr_id, "typicalDay")
+                    except:
+                        day = datetime.utcnow().day
+                    
+                    try:
+                        hour = codes_get(bufr_id, "typicalHour")
+                    except:
+                        hour = 0
+                    
+                    forecast_date = datetime(year, month, day, hour)
+                    forecast_hour = 0
 
-                for msg in messages:
-                    # Expect arrays of lat, lon, value (e.g., temperature)
-                    lats = np.array(msg.get("latitude", []), dtype=float)
-                    lons = np.array(msg.get("longitude", []), dtype=float)
+                    # Extract coordinate data
+                    try:
+                        lats = np.array(codes_get_array(bufr_id, "latitude"), dtype=float)
+                    except:
+                        lats = np.array([], dtype=float)
+                    
+                    try:
+                        lons = np.array(codes_get_array(bufr_id, "longitude"), dtype=float)
+                    except:
+                        lons = np.array([], dtype=float)
 
                     # Find any numeric measurement field
                     value = None
+                    parameter = "unknown"
+                    
+                    # Try to get various possible parameters
                     for key in ("airTemperature", "temperature", "windSpeed", "totalPrecipitation"):
-                        if key in msg:
-                            value = np.array(msg.get(key), dtype=float)
-                            parameter = key
-                            break
+                        try:
+                            value_data = codes_get_array(bufr_id, key)
+                            if value_data is not None and len(value_data) > 0:
+                                value = np.array(value_data, dtype=float)
+                                parameter = key
+                                break
+                        except:
+                            continue
+                    
+                    # Skip if no valid data found
                     if value is None or lats.size == 0 or lons.size == 0:
-                        # Not suitable for our schema; skip
                         continue
 
                     # Attempt to infer a grid by sorting unique lat/lon
@@ -60,7 +97,6 @@ class BufrParser:
 
                     # Check if values fit grid_size_lat * grid_size_lon
                     if value.size != grid_size_lat * grid_size_lon:
-                        # Cannot reshape to a regular grid; our DB requires gridded fields
                         raise ValueError("BUFR message is not a regular grid and cannot be stored in forecast_data")
 
                     # Compute bounds and steps
@@ -73,43 +109,38 @@ class BufrParser:
 
                     values = value.reshape((grid_size_lat, grid_size_lon)).astype(np.float32).ravel(order="C").tolist()
 
-                    # Time
-                    year = int(msg.get("year", [datetime.utcnow().year])[0])
-                    month = int(msg.get("month", [datetime.utcnow().month])[0])
-                    day = int(msg.get("day", [datetime.utcnow().day])[0])
-                    hour = int(msg.get("hour", [0])[0])
-                    forecast_date = datetime(year, month, day, hour)
-                    forecast_hour = 0
+                    # Get data source and other metadata
+                    try:
+                        data_category = codes_get_string(bufr_id, "dataCategory")
+                    except:
+                        data_category = "unknown"
+                    
+                    data_source = resolve_data_source(file_name, fallback=data_category)
 
-                    # Units and level if present
-                    parameter_unit = ""
-                    surface_type = "surface"
-                    surface_value = 0.0
-
-                    data_source = resolve_data_source(file_name, fallback=str(msg.get("dataCategory", "unknown")))
-
+                    # Create DTO
                     dto = ForecastDataDTO(
                         id=str(uuid.uuid4()),
                         forecast_date=forecast_date,
                         forecast_hour=forecast_hour,
                         data_source=data_source,
                         parameter=parameter,
-                        parameter_unit=parameter_unit,
-                        surface_type=surface_type,
-                        surface_value=float(surface_value),
-                        min_lon=float(min_lon),
-                        max_lon=float(max_lon),
-                        min_lat=float(min_lat),
-                        max_lat=float(max_lat),
-                        lon_step=float(lon_step),
-                        lat_step=float(lat_step),
-                        grid_size_lat=int(grid_size_lat),
-                        grid_size_lon=int(grid_size_lon),
+                        parameter_unit="",  # You may need to extract this from BUFR metadata
+                        surface_type="surface",
+                        surface_value=0.0,
+                        min_lon=min_lon,
+                        max_lon=max_lon,
+                        min_lat=min_lat,
+                        max_lat=max_lat,
+                        lon_step=lon_step,
+                        lat_step=lat_step,
+                        grid_size_lat=grid_size_lat,
+                        grid_size_lon=grid_size_lon,
                         values=values,
                         file_name=file_name,
                     )
                     dtos.append(dto)
 
+                finally:
+                    codes_release(bufr_id)
+
         return dtos
-
-
