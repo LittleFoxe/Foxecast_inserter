@@ -5,7 +5,6 @@ from pathlib import Path
 
 def test_parser_returns_complete_dto():
     # Using sample file for testing the functionality of the parser unit
-    # TODO: define the sample.grib location
     test_file = Path(__file__).parent / "sample.grib2"
 
     parser = ParserService()
