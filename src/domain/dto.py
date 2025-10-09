@@ -27,5 +27,3 @@ class ForecastDataDTO(BaseModel):
     grid_size_lon: int
     values: List[float]
     file_name: str
-
-

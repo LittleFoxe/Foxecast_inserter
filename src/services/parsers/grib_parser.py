@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import List
-
 import numpy as np
 import xarray as xr
 
@@ -135,5 +134,3 @@ class GribParser:
             dtos.append(dto)
 
         return dtos
-
-

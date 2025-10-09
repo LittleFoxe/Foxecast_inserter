@@ -39,5 +39,3 @@ class ParserService:
 
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         return dtos, elapsed_ms
-
-

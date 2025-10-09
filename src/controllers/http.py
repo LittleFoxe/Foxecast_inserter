@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from typing import Callable, Tuple
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, AnyUrl, Field
 from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 
-from src.infrastructure.config import settings
+from src.infrastructure.config import settings, Settings
 from src.services.parser_service import ParserService
 from src.services.db_service import DatabaseService
 from src.infrastructure.downloader import download_to_tempfile
@@ -24,6 +25,33 @@ class InsertRequest(BaseModel):
     )
 
 
+def get_settings() -> Settings:
+    """Provide service settings as a dependency.
+
+    Exposed for tests to override via app.dependency_overrides.
+    """
+    return settings
+
+
+def get_downloader() -> Callable[[str, int], Tuple[str, int, int]]:
+    """Provide file downloader function as a dependency.
+
+    Returns a callable that takes (url, timeout_seconds) and returns
+    (local_path, size_bytes, elapsed_ms).
+    """
+    return download_to_tempfile
+
+
+def get_parser_service() -> ParserService:
+    """Provide ParserService as a dependency."""
+    return ParserService()
+
+
+def get_db_service() -> DatabaseService:
+    """Provide DatabaseService as a dependency."""
+    return DatabaseService()
+
+
 @router.get("/health", status_code=HTTP_200_OK, summary="Health check", tags=["system"])
 def health() -> dict:
     """Returns 200 OK if the service is up."""
@@ -31,7 +59,13 @@ def health() -> dict:
 
 
 @router.post("/insert", status_code=HTTP_200_OK, summary="Parse file and insert to DB", tags=["usage"])
-def insert(payload: InsertRequest) -> dict:
+def insert(
+    payload: InsertRequest,
+    settings_dep: Settings = Depends(get_settings),
+    downloader: Callable[[str, int], Tuple[str, int, int]] = Depends(get_downloader),
+    parser: ParserService = Depends(get_parser_service),
+    db: DatabaseService = Depends(get_db_service),
+) -> dict:
     """Downloads a binary file by URL, parses the content, and inserts data into ClickHouse.
 
     - On parsing error returns 400 with details
@@ -44,18 +78,16 @@ def insert(payload: InsertRequest) -> dict:
     file_name = payload.url.path.split("/")[-1]
 
     try:
-        local_path, size_bytes, download_ms = download_to_tempfile(str(payload.url), settings.download_timeout_seconds)
+        local_path, size_bytes, download_ms = downloader(str(payload.url), settings_dep.download_timeout_seconds)
     except Exception as exc:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=f"Download error: {exc}") from exc
 
     try:
-        parser = ParserService()
         dtos, parse_ms = parser.parse_file(local_path, file_name=file_name)
     except Exception as exc:
         raise HTTPException(status_code=HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Parsing error: {exc}") from exc
 
     try:
-        db = DatabaseService()
         inserted_rows, db_ms = db.insert_batch(dtos, file_name=file_name)
     except Exception as exc:
         raise HTTPException(status_code=HTTP_500_INTERNAL_SERVER_ERROR, detail=f"DB error: {exc}") from exc
@@ -76,5 +108,3 @@ def insert(payload: InsertRequest) -> dict:
         "db_ms": db_ms,
         "inserted_rows": inserted_rows,
     }
-
-
