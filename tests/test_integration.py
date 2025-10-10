@@ -40,10 +40,9 @@ def test_insert_into_clickhouse(monkeypatch, tmp_path):
     r = client.post("/insert", json={"url": "http://localhost/tiny.grib"})
 
     # Assert
-    assert r.status_code in (200, 500)
-    if r.status_code == 200:
-        payload = r.json()
-        assert payload.get("file_name") == "tiny.grib"
+    assert r.status_code == 200
+    payload = r.json()
+    assert payload.get("file_name") == "tiny.grib"
 
     app.dependency_overrides.clear()
 
@@ -61,10 +60,9 @@ def test_download_from_url(monkeypatch, tmp_path):
     app.dependency_overrides[get_downloader] = lambda: fake_download
 
     r = client.post("/insert", json={"url": "http://example.com/remote.grib"})
-    assert r.status_code in (200, 500)
-    if r.status_code == 200:
-        payload = r.json()
-        assert payload.get("file_name") == "remote.grib"
+    assert r.status_code == 200
+    payload = r.json()
+    assert payload.get("file_name") == "remote.grib"
 
     app.dependency_overrides.clear()
 
