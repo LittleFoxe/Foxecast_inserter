@@ -6,13 +6,14 @@ from clickhouse_connect import get_client
 from fastapi.testclient import TestClient
 
 from src.main import app
-from src.infrastructure.config import settings
-from src.controllers.http import get_downloader
+from src.infrastructure.service_provider import get_downloader, get_settings
 
 
 client = TestClient(app)
 
 def test_insert_into_clickhouse(monkeypatch, tmp_path):
+    # Getting the settings from the provider
+    settings = get_settings()
     # Initializing connection variables
     ch_host = os.getenv("CH_HOST", settings.ch_host)
     ch_port = int(os.getenv("CH_PORT", settings.ch_port))

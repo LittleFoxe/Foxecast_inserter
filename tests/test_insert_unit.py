@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from src.main import app
-from src.controllers.http import get_downloader
+from src.infrastructure.service_provider import get_downloader
 
 
 client = TestClient(app)
