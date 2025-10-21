@@ -1,0 +1,10 @@
+# Clickhouse parameter
+CH_HOST=0.0.0.0
+CH_PORT=8123
+CH_USER=user
+CH_PASSWORD=password
+CH_DATABASE=forecast_test
+
+# General settings
+DOWNLOAD_TIMEOUT_SECONDS=300
+ENABLE_METRICS=true
