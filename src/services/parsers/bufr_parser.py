@@ -38,12 +38,12 @@ class BufrParser:
                     try:
                         year = codes_get(bufr_id, "typicalYear")
                     except:
-                        year = datetime.now(datetime.timezone.utc).year
+                        year = datetime.utcnow().year
                     
                     try:
                         month = codes_get(bufr_id, "typicalMonth")
                     except:
-                        month = datetime.now(datetime.timezone.utc).month
+                        month = datetime.utcnow().month
                     
                     try:
                         day = codes_get(bufr_id, "typicalDay")
