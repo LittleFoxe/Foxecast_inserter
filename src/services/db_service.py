@@ -11,6 +11,7 @@ class DatabaseService:
     """Handles batch inserts into ClickHouse with simple file_name uniqueness check."""
 
     def __init__(self) -> None:
+        """Initializes the DatabaseService with a ClickHouse client using configuration from settings module."""
         self.client = get_client(
             host=settings.ch_host,
             port=settings.ch_port,
@@ -20,11 +21,40 @@ class DatabaseService:
         )
 
     def _already_ingested(self, file_name: str) -> bool:
+        """
+        Checks if a file has already been ingested into the forecast_data table.
+
+        Executes a COUNT() query with LIMIT 1 to verify existence of records with the specified file_name.
+
+        Args:
+            file_name (str): Name of the file to check for existence
+
+        Returns:
+            bool: True if file_name exists in the table (file has been ingested), False otherwise
+        """
         query = "SELECT count() FROM forecast_data WHERE file_name = %(file_name)s LIMIT 1"
         res = self.client.query(query, parameters={"file_name": file_name})
         return int(res.result_rows[0][0]) > 0
 
     def insert_batch(self, dtos: Iterable[ForecastDataDTO], file_name: str) -> Tuple[int, int]:
+        """
+        Inserts a batch of ForecastDataDTO records with file's name into ClickHouse
+        if the file has not already been ingested.
+
+        Performs a uniqueness check before insertion and returns metrics about the operation.
+
+        Args:
+            dtos (Iterable[ForecastDataDTO]): Collection of data transfer objects to insert
+            file_name (str): Identifier for the data file batch
+
+        Returns:
+            Tuple[int, int]: 
+                - Number of successfully inserted rows
+                - Time taken for operation in milliseconds
+
+        Note:
+            Will return (0, time) if file_name already exists in the table
+        """
         start = time.perf_counter()
 
         if self._already_ingested(file_name):
@@ -83,3 +113,10 @@ class DatabaseService:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         return len(rows), elapsed_ms
     
+    def clear_test_data(self):
+        """
+        Clears all data from the forecast_data table.
+
+        Executes a TRUNCATE TABLE query which removes all records but preserves table structure.
+        """
+        self.client.query("TRUNCATE TABLE forecast_data")

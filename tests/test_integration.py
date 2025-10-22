@@ -1,15 +1,19 @@
 import os
+from pathlib import Path
+import shutil
 import time
 
 import pytest
 from clickhouse_connect import get_client
 from fastapi.testclient import TestClient
 
+from src.services.db_service import DatabaseService
 from src.main import app
 from src.infrastructure.service_provider import get_downloader, get_settings
 
 
 client = TestClient(app)
+db = DatabaseService()
 
 def test_insert_into_clickhouse(monkeypatch, tmp_path):
     # Getting the settings from the provider
@@ -28,8 +32,9 @@ def test_insert_into_clickhouse(monkeypatch, tmp_path):
         pytest.fail("ClickHouse is not reachable")
 
     # Prepare a fake local file and mock downloader
-    local_file = tmp_path / "tiny.grib"
-    local_file.write_bytes(b"GRIB")
+    source_file = Path(__file__).parent / "sample.grib2"
+    local_file = tmp_path / "sample.grib2"
+    shutil.copy2(source_file, local_file)
 
     def fake_download(url: str, timeout: int):
         return str(local_file), len(local_file.read_bytes()), 1
@@ -38,16 +43,20 @@ def test_insert_into_clickhouse(monkeypatch, tmp_path):
     app.dependency_overrides[get_downloader] = lambda: fake_download
 
     # Act
-    r = client.post("/insert", json={"url": "http://localhost/tiny.grib"})
+    r = client.post("/insert", json={"url": "http://localhost/sample.grib2"})
 
     # Assert
     assert r.status_code == 200
     payload = r.json()
-    assert payload.get("file_name") == "tiny.grib"
+    assert payload.get("file_name") == "sample.grib2"
+
+    # Remove testing data after insertion
+    db.clear_test_data()
 
     app.dependency_overrides.clear()
 
 
+# TODO: Add downloading testing file from S3
 def test_download_from_url(monkeypatch, tmp_path):
     # Mock downloader to simulate network download
     local_file = tmp_path / "remote.grib"
@@ -65,6 +74,9 @@ def test_download_from_url(monkeypatch, tmp_path):
     payload = r.json()
     assert payload.get("file_name") == "remote.grib"
 
+    # Remove testing data after insertion
+    db.clear_test_data()
+
     app.dependency_overrides.clear()
 
-# TODO: RabbitMQ integration and overall system test with S3, Clickhouse and RabbitMQ overall
+# TODO: RabbitMQ integration and overall system test with S3, Clickhouse and RabbitMQ
