@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from controllers.http import router as http_router
-from metrics.metrics import setup_metrics, metrics_router
+from src.controllers.http import router as http_router
+from src.metrics.metrics import setup_metrics, metrics_router
 
 
 def create_app() -> FastAPI:
@@ -21,5 +21,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
-

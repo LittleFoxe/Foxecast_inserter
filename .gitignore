@@ -1,5 +1,6 @@
 # Ignoring local test GRIB data
-*.grib
+*.grib*
+*.GRIB*
 
 # Ignoring VSCode configs
 .vscode/

@@ -19,5 +19,3 @@ def download_to_tempfile(url: str, timeout_seconds: int) -> Tuple[str, int, int]
                 size += len(chunk)
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     return path, size, elapsed_ms
-
-

@@ -1,21 +1,19 @@
-from services.parser_service import ParserService
+import pytest
+from src.services.parser_service import ParserService
+from pathlib import Path
 
 
-def test_parser_returns_complete_dto(tmp_path):
+def test_parser_returns_complete_dto():
     # Using sample file for testing the functionality of the parser unit
-    # TODO: define the sample.grib location
-    test_file = tmp_path / "sample.grib"
-    # Earthkit will likely fail on non-GRIB, so we skip if exception.
-    test_file.write_bytes(b"GRIB")
+    test_file = Path(__file__).parent / "sample.grib2"
 
     parser = ParserService()
 
     try:
-        dtos, _ = parser.parse_file(str(test_file), file_name="sample.grib")
+        dtos, _ = parser.parse_file(str(test_file), file_name="sample.grib2")
     except Exception:
         # If earthkit cannot parse the dummy file, the unit test cannot proceed.
-        # Mark as xfail-like behavior by returning early; in CI we will provide a real file.
-        return
+        pytest.fail("Cannot parse local testing file!")
 
     assert dtos, "Parser should return at least one DTO"
     d = dtos[0]
@@ -38,6 +36,4 @@ def test_parser_returns_complete_dto(tmp_path):
     assert isinstance(d.grid_size_lat, int)
     assert isinstance(d.grid_size_lon, int)
     assert isinstance(d.values, list) and len(d.values) > 0
-    assert d.file_name == "sample.grib"
-
-
+    assert d.file_name == "sample.grib2"

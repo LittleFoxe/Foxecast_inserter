@@ -29,5 +29,3 @@ def setup_metrics(app: FastAPI) -> None:
     """
     # Currently no middleware required as the endpoints will update metrics directly
     _ = app
-
-
