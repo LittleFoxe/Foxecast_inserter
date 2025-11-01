@@ -1,23 +1,59 @@
+from functools import wraps
 import os
 from pathlib import Path
 import shutil
-import time
-
 import pytest
+
 from clickhouse_connect import get_client
 from fastapi.testclient import TestClient
 
-from src.services.db_service import DatabaseService
 from src.main import app
-from src.infrastructure.service_provider import get_downloader, get_settings
+from src.infrastructure.service_provider import \
+    get_downloader, get_settings, get_db_service
 
 
 client = TestClient(app)
-db = DatabaseService()
+settings = get_settings()
 
+def convert_to_test_db(func):
+    """
+    Decorator for replacing the main DB to testing DB while running tests
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Saving the name of the base DB
+        temp_db_name = settings.ch_database
+        # Replacing the name of the database while testing
+        settings.ch_database = "forecast_test"
+        
+        try:
+            # Running the test function
+            return func(*args, **kwargs)
+        finally:
+            # Returning to the base DB
+            settings.ch_database = temp_db_name
+            
+    return wrapper
+
+def test_connection_to_main_db():
+    # Testing the connection to main DB without changing the data
+    db = get_db_service()
+
+    # Asserting the connection object
+    assert db.client != None
+    # Checking if the DB name is not the same as the testing DB
+    assert settings.ch_database != "forecast_test"
+    # Asserting the DB name
+    assert db.client.database == settings.ch_database
+
+    # Disconnectig from DB
+    db.disconnect()
+
+@convert_to_test_db
 def test_insert_into_clickhouse(monkeypatch, tmp_path):
-    # Getting the settings from the provider
-    settings = get_settings()
+    # Getting db service from provider
+    db = get_db_service()
+
     # Initializing connection variables
     ch_host = os.getenv("CH_HOST", settings.ch_host)
     ch_port = int(os.getenv("CH_PORT", settings.ch_port))
@@ -31,7 +67,7 @@ def test_insert_into_clickhouse(monkeypatch, tmp_path):
     except Exception:
         pytest.fail("ClickHouse is not reachable")
 
-    # Prepare a fake local file and mock downloader
+    # Prepare a local testing file and mock downloader
     source_file = Path(__file__).parent / "sample.grib2"
     local_file = tmp_path / "sample.grib2"
     shutil.copy2(source_file, local_file)
@@ -51,32 +87,29 @@ def test_insert_into_clickhouse(monkeypatch, tmp_path):
     assert payload.get("file_name") == "sample.grib2"
 
     # Remove testing data after insertion
-    db.clear_test_data()
+    db.clear_data()
+    db.disconnect()
 
     app.dependency_overrides.clear()
 
 
 # TODO: Add downloading testing file from S3
 def test_download_from_url(monkeypatch, tmp_path):
-    # Mock downloader to simulate network download
-    local_file = tmp_path / "remote.grib"
-    local_file.write_bytes(b"GRIB")
+    # Getting downloader from provider
+    download_file = get_downloader()
 
-    # This should basically be downloaded from S3
-    def fake_download(url: str, timeout: int):
-        time.sleep(0.01)
-        return str(local_file), len(local_file.read_bytes()), 10
+    # Downloading the file from testing S3
+    path, size, ms = download_file("http://localhost:9100/forecast-data/tests/sample.grib2", 120)
 
-    app.dependency_overrides[get_downloader] = lambda: fake_download
+    # Basic assertion of the parameters
+    assert size > 0
+    assert ms > 0
+    assert "forecast_" in path
 
-    r = client.post("/insert", json={"url": "http://example.com/remote.grib"})
-    assert r.status_code == 200
-    payload = r.json()
-    assert payload.get("file_name") == "remote.grib"
-
-    # Remove testing data after insertion
-    db.clear_test_data()
-
-    app.dependency_overrides.clear()
+    # Removing temp file
+    try:
+        os.remove(path)
+    except Exception as e:
+        print(f"Cannot delete temp file: {e}")
 
 # TODO: RabbitMQ integration and overall system test with S3, Clickhouse and RabbitMQ
