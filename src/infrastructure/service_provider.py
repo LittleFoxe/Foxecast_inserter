@@ -14,7 +14,7 @@ def get_settings() -> Settings:
 def get_downloader() -> Callable[[str, int], Tuple[str, int, int]]:
     """Provide file downloader function as a dependency.
     
-    Returns a callable that takes (url, timeout_seconds) and returns
+    Returns a function that takes (url, timeout_seconds) and returns
     (local_path, size_bytes, elapsed_ms).
     """
     return download_to_tempfile
