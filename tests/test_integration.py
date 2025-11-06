@@ -9,11 +9,11 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.infrastructure.service_provider import \
-    get_downloader, get_settings, get_db_service
+    get_downloader, get_testing_settings, get_db_service
 
 
 client = TestClient(app)
-settings = get_settings()
+settings = get_testing_settings()
 
 def convert_to_test_db(func):
     """
@@ -24,7 +24,7 @@ def convert_to_test_db(func):
         # Saving the name of the base DB
         temp_db_name = settings.ch_database
         # Replacing the name of the database while testing
-        settings.ch_database = "forecast_test"
+        settings.ch_database = settings.ch_test
         
         try:
             # Running the test function
@@ -35,14 +35,18 @@ def convert_to_test_db(func):
             
     return wrapper
 
-def test_connection_to_main_db():
+"""
+Added the letter 'z', because PyTest launches tests alphabetically.
+And it would be better for this test to run after all the integration tests.
+"""
+def test_zconnection_to_main_db(): 
     # Testing the connection to main DB without changing the data
     db = get_db_service()
 
     # Asserting the connection object
     assert db.client != None
     # Checking if the DB name is not the same as the testing DB
-    assert settings.ch_database != "forecast_test"
+    assert settings.ch_database != settings.ch_test
     # Asserting the DB name
     assert db.client.database == settings.ch_database
 
@@ -92,14 +96,12 @@ def test_insert_into_clickhouse(monkeypatch, tmp_path):
 
     app.dependency_overrides.clear()
 
-
-# TODO: Add downloading testing file from S3
 def test_download_from_url(monkeypatch, tmp_path):
     # Getting downloader from provider
     download_file = get_downloader()
 
     # Downloading the file from testing S3
-    path, size, ms = download_file("http://localhost:9100/forecast-data/tests/sample.grib2", 120)
+    path, size, ms = download_file(settings.url_test, 120)
 
     # Basic assertion of the parameters
     assert size > 0

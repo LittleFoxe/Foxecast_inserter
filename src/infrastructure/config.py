@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-
 @dataclass
 class Settings:
     """Service configuration loaded from environment variables."""
@@ -27,6 +26,16 @@ class Settings:
 
     # Using metrics
     enable_metrics: bool = os.getenv("ENABLE_METRICS", "true").lower() == "true"
+
+@dataclass
+class TestSettings(Settings):
+    """Service configuration for testing environment."""
+    # Parameters for integration tests
+    ch_test: str = os.getenv("CH_TEST_DB", "forecast_test")
+    url_test: str = os.getenv("URL_TEST", "")
+
+    # Other parameters should be changed inside env-file
+    # or by the orchestrator and its environment
 
 
 settings = Settings()
