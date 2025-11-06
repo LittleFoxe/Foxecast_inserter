@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, AnyUrl, Field
 from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 
-from src.metrics.metrics import update_all_metrics, file_download_seconds, file_size_bytes, network_bytes_total, parse_seconds, db_insert_seconds
+from src.metrics.metrics import update_all_metrics
 from src.infrastructure.service_provider import get_settings, get_downloader, get_parser_service, get_db_service
 
 
