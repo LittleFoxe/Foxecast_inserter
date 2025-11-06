@@ -17,7 +17,8 @@ settings = get_testing_settings()
 
 def convert_to_test_db(func):
     """
-    Decorator for replacing the main DB to testing DB while running tests
+    Decorator for replacing the main DB to testing DB while running tests.
+    Used to avoid the problem with TestSettings and Settings having the same variable ch_database.
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -35,26 +36,54 @@ def convert_to_test_db(func):
             
     return wrapper
 
-"""
-Added the letter 'z', because PyTest launches tests alphabetically.
-And it would be better for this test to run after all the integration tests.
-"""
-def test_zconnection_to_main_db(): 
-    # Testing the connection to main DB without changing the data
-    db = get_db_service()
+def test_1_download_from_url(monkeypatch, tmp_path):
+    """
+    Test file download functionality from external URL.
+    
+    Steps:
+    - Download test file from configured test URL
+    - Validate download results and file properties
+    - Clean up temporary downloaded file
+    
+    Asserts:
+    - Downloaded file has positive size
+    - Download operation completes within expected time
+    - File path contains expected naming pattern
+    """
+    # Getting downloader from provider
+    download_file = get_downloader()
 
-    # Asserting the connection object
-    assert db.client != None
-    # Checking if the DB name is not the same as the testing DB
-    assert settings.ch_database != settings.ch_test
-    # Asserting the DB name
-    assert db.client.database == settings.ch_database
+    # Downloading the file from testing S3
+    path, size, ms = download_file(settings.url_test, 120)
 
-    # Disconnectig from DB
-    db.disconnect()
+    # Basic assertion of the parameters
+    assert size > 0
+    assert ms > 0
+    assert "forecast_" in path
+
+    # Removing temp file
+    try:
+        os.remove(path)
+    except Exception as e:
+        print(f"Cannot delete temp file: {e}")
 
 @convert_to_test_db
-def test_insert_into_clickhouse(monkeypatch, tmp_path):
+def test_2_insert_into_clickhouse(monkeypatch, tmp_path):
+    """
+    Test GRIB file insertion into ClickHouse using mocked file download.
+    
+    Steps:
+    - Setup test database connection
+    - Verify ClickHouse availability
+    - Prepare local test file and mock downloader
+    - Execute HTTP POST to insert endpoint
+    - Validate response and clean up test data
+    
+    Asserts:
+    - HTTP 200 status code on successful insertion
+    - Response contains expected file name
+    - Test data is properly cleaned up
+    """
     # Getting db service from provider
     db = get_db_service()
 
@@ -96,32 +125,44 @@ def test_insert_into_clickhouse(monkeypatch, tmp_path):
 
     app.dependency_overrides.clear()
 
-def test_download_from_url(monkeypatch, tmp_path):
-    # Getting downloader from provider
-    download_file = get_downloader()
+def test_3_connection_to_main_db():
+    """
+    Verify connection to main production database without modifying test environment.
+    Checks if the link to main DB is not changed to testing DB.
+    
+    Asserts:
+    - Database client connection is established successfully
+    - Production and test database names are distinct
+    - Connected database matches the production database name
+    """
+    # Testing the connection to main DB without changing the data
+    db = get_db_service()
 
-    # Downloading the file from testing S3
-    path, size, ms = download_file(settings.url_test, 120)
+    # Asserting the connection object
+    assert db.client != None
+    # Checking if the DB name is not the same as the testing DB
+    assert settings.ch_database != settings.ch_test
+    # Asserting the DB name
+    assert db.client.database == settings.ch_database
 
-    # Basic assertion of the parameters
-    assert size > 0
-    assert ms > 0
-    assert "forecast_" in path
+    # Disconnectig from DB
+    db.disconnect()
 
-    # Removing temp file
-    try:
-        os.remove(path)
-    except Exception as e:
-        print(f"Cannot delete temp file: {e}")
-
-def test_broker_integration():
+def test_4_broker_integration():
     """
     Verify AMQP consumer can connect and subscribe without real broker using mocks.
 
+    Steps:
+    - Create fake RabbitMQ connection and channel objects
+    - Mock aio-pika connect_robust function
+    - Start consumer task and verify subscription
+    - Cancel task and validate clean shutdown
+    
     Asserts:
-    - connect is called
-    - channel/queue/consume are invoked without raising
-    - consumer task can be cancelled cleanly
+    - Connection establish and channel creation succeed
+    - QoS prefetch count is set correctly
+    - Queue consumption starts with valid callback
+    - Consumer task can be cancelled without errors
     """
     import types
     import asyncio
@@ -185,13 +226,8 @@ def test_broker_integration():
     # Run in an isolated loop
     asyncio.run(_run_once_and_cancel())
 
-
-"""
-Added the letter 'zz', because PyTest launches tests alphabetically.
-And it would be better to launch e2e-test after all the others.
-"""
 @convert_to_test_db
-def test_zz_overall_integration():
+def test_5_overall_integration():
     """
     Simulate end-to-end workflow via AMQP handler and HTTP POST, and assert metrics.
 
@@ -293,3 +329,4 @@ def test_zz_overall_integration():
     db.clear_data()
     db.disconnect()
     app.dependency_overrides.clear()
+    
