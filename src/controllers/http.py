@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, AnyUrl, Field
 from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 
-from src.metrics.metrics import file_download_seconds, file_size_bytes, network_bytes_total, parse_seconds, db_insert_seconds
+from src.metrics.metrics import update_all_metrics
 from src.infrastructure.service_provider import get_settings, get_downloader, get_parser_service, get_db_service
 
 
@@ -63,11 +63,11 @@ def insert(
         raise HTTPException(status_code=HTTP_500_INTERNAL_SERVER_ERROR, detail=f"DB error: {exc}") from exc
 
     # Update metrics
-    file_download_seconds.observe(download_ms / 1000.0)
-    parse_seconds.observe(parse_ms / 1000.0)
-    db_insert_seconds.observe(db_ms / 1000.0)
-    file_size_bytes.set(size_bytes)
-    network_bytes_total.inc(size_bytes)
+    update_all_metrics(
+        download_ms=download_ms,
+        parse_ms=parse_ms,
+        db_ms=db_ms,
+        file_size=size_bytes)
 
     return {
         "status": "ok",
