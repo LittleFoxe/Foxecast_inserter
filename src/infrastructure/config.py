@@ -31,8 +31,13 @@ class Settings:
 class TestSettings(Settings):
     """Service configuration for testing environment."""
     # Parameters for integration tests
-    ch_test: str = os.getenv("CH_TEST_DB", "forecast_test")
     url_test: str = os.getenv("URL_TEST", "")
+
+    """TODO: use ch_database in tests instead of ch_test replacement
+    (for now we use separate variable for testing DB,
+    but in the future it should somehow
+    override ch_database from Settings)"""
+    ch_test: str = os.getenv("CH_TEST_DB", "forecast_test")
 
     # Other parameters should be changed inside env-file
     # or by the orchestrator and its environment

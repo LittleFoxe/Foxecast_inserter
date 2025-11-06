@@ -23,6 +23,7 @@ def get_downloader() -> Callable[[str, int], Tuple[str, int, int]]:
     """
     return download_to_tempfile
 
+# TODO: Make dependency injection for AMQP consumer
 
 def get_parser_service() -> ParserService:
     """Provide ParserService as a dependency."""
