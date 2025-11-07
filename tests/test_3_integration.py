@@ -1,4 +1,3 @@
-from functools import wraps
 import os
 from pathlib import Path
 import shutil
@@ -14,27 +13,6 @@ from src.infrastructure.service_provider import \
 
 client = TestClient(app)
 settings = get_testing_settings()
-
-def convert_to_test_db(func):
-    """
-    Decorator for replacing the main DB to testing DB while running tests.
-    Used to avoid the problem with TestSettings and Settings having the same variable ch_database.
-    """
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        # Saving the name of the base DB
-        temp_db_name = settings.ch_database
-        # Replacing the name of the database while testing
-        settings.ch_database = settings.ch_test
-        
-        try:
-            # Running the test function
-            return func(*args, **kwargs)
-        finally:
-            # Returning to the base DB
-            settings.ch_database = temp_db_name
-            
-    return wrapper
 
 def test_1_download_from_url(monkeypatch, tmp_path):
     """
@@ -67,7 +45,6 @@ def test_1_download_from_url(monkeypatch, tmp_path):
     except Exception as e:
         print(f"Cannot delete temp file: {e}")
 
-@convert_to_test_db
 def test_2_insert_into_clickhouse(monkeypatch, tmp_path):
     """
     Test GRIB file insertion into ClickHouse using mocked file download.
@@ -108,8 +85,18 @@ def test_2_insert_into_clickhouse(monkeypatch, tmp_path):
     def fake_download(url: str, timeout: int):
         return str(local_file), len(local_file.read_bytes()), 1
 
-    # Override downloader dependency
+    """
+    As of now dependencies are overriden both by app.dependency_overrides and monkeypatch.
+
+    get_downloader is overriden by app because the insert() method in the controller
+    directly uses Depends() in the parameters to get the correct dependency.
+
+    get_settings is overriden by monkeypatch because it is used without Depends()
+    in the infrastructure part of the app.
+    """
+
     app.dependency_overrides[get_downloader] = lambda: fake_download
+    monkeypatch.setattr("src.infrastructure.service_provider.get_settings", get_testing_settings)
 
     # Act
     r = client.post("/insert", json={"url": "http://localhost/sample.grib2"})
@@ -122,33 +109,9 @@ def test_2_insert_into_clickhouse(monkeypatch, tmp_path):
     # Remove testing data after insertion
     db.clear_data()
     db.disconnect()
-
     app.dependency_overrides.clear()
 
-def test_3_connection_to_main_db():
-    """
-    Verify connection to main production database without modifying test environment.
-    Checks if the link to main DB is not changed to testing DB.
-    
-    Asserts:
-    - Database client connection is established successfully
-    - Production and test database names are distinct
-    - Connected database matches the production database name
-    """
-    # Testing the connection to main DB without changing the data
-    db = get_db_service()
-
-    # Asserting the connection object
-    assert db.client != None
-    # Checking if the DB name is not the same as the testing DB
-    assert settings.ch_database != settings.ch_test
-    # Asserting the DB name
-    assert db.client.database == settings.ch_database
-
-    # Disconnectig from DB
-    db.disconnect()
-
-def test_4_broker_integration():
+def test_3_broker_integration():
     """
     Verify AMQP consumer can connect and subscribe without real broker using mocks.
 
@@ -226,8 +189,7 @@ def test_4_broker_integration():
     # Run in an isolated loop
     asyncio.run(_run_once_and_cancel())
 
-@convert_to_test_db
-def test_5_overall_integration():
+def test_0_overall_integration(monkeypatch):
     """
     Simulate end-to-end workflow via AMQP handler and HTTP POST, and assert metrics.
 
@@ -241,6 +203,9 @@ def test_5_overall_integration():
     from src.infrastructure.rabbit_consumer import handle_message
     from src.infrastructure.service_provider import get_db_service
 
+    # Overriding dependencies for testing
+    monkeypatch.setattr("src.infrastructure.service_provider.get_settings", get_testing_settings)
+
     # Initializing db service to clear data after the test
     db = get_db_service()
 
@@ -249,7 +214,7 @@ def test_5_overall_integration():
 
     # 1) Simulate AMQP message handling with test URL
     # (it should be used instead of sending to the real queue,
-    # because it might break the logic)
+    # because it might break the logic of the actually running app)
     class FakeIncomingMessage:
         def __init__(self, body: bytes):
             self.body = body

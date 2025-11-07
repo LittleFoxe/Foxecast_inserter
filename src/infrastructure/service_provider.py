@@ -1,4 +1,5 @@
 from typing import Callable, Tuple
+
 from src.infrastructure.config import Settings, TestSettings, settings, test_settings
 from src.services.parser_service import ParserService
 from src.services.db_service import DatabaseService
@@ -25,10 +26,14 @@ def get_downloader() -> Callable[[str, int], Tuple[str, int, int]]:
 # TODO: Make dependency injection for AMQP consumer
 
 def get_parser_service() -> ParserService:
-    """Provide ParserService as a dependency."""
+    """Provide parser service as a dependency."""
     return ParserService()
 
-
 def get_db_service() -> DatabaseService:
-    """Provide DatabaseService as a dependency."""
-    return DatabaseService()
+    """
+    Provide database service as a dependency.
+    
+    Args:
+        settings (Settings): Configuration settings with env variables
+    """
+    return DatabaseService(get_settings())
