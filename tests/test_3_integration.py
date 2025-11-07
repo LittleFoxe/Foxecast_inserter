@@ -130,7 +130,7 @@ def test_3_broker_integration():
     import types
     import asyncio
     from unittest.mock import patch
-    from src.infrastructure.rabbit_consumer import run_consumer
+    from src.infrastructure.service_provider import get_broker_consumer
 
     # Simple fakes for aio-pika interfaces
     class FakeQueue:
@@ -173,7 +173,7 @@ def test_3_broker_integration():
 
         with patch("src.infrastructure.rabbit_consumer.aio_pika.connect_robust", new=fake_connect):
             # Start consumer and cancel shortly after
-            task = asyncio.create_task(run_consumer())
+            task = asyncio.create_task(get_broker_consumer())
             await asyncio.sleep(0.05)
             # Ensure subscribed without exception
             assert fake_conn.channel_obj.prefetch is not None
@@ -189,7 +189,7 @@ def test_3_broker_integration():
     # Run in an isolated loop
     asyncio.run(_run_once_and_cancel())
 
-def test_0_overall_integration(monkeypatch):
+def test_4_overall_integration(monkeypatch):
     """
     Simulate end-to-end workflow via AMQP handler and HTTP POST, and assert metrics.
 
@@ -200,8 +200,8 @@ def test_0_overall_integration(monkeypatch):
     """
     import asyncio
     import json
-    from src.infrastructure.rabbit_consumer import handle_message
-    from src.infrastructure.service_provider import get_db_service
+    from src.infrastructure.rabbit_consumer import RabbitHandler
+    from src.infrastructure.service_provider import get_db_service, get_broker_dto
 
     # Overriding dependencies for testing
     monkeypatch.setattr("src.infrastructure.service_provider.get_settings", get_testing_settings)
@@ -234,8 +234,11 @@ def test_0_overall_integration(monkeypatch):
         # Use the test URL in the AMQP message
         payload = {"file": settings.url_test}
         msg = FakeIncomingMessage(json.dumps(payload).encode("utf-8"))
-        # Override downloader used by handler through provider
-        await handle_message(msg)
+
+        # We should use the handler directly to avoid creating 
+        # real consumer by service_provider
+        handler = RabbitHandler(get_broker_dto(), settings)
+        await handler._handle_message(msg)
 
     asyncio.run(_run_handler_once())
 
