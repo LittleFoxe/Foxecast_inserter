@@ -1,9 +1,12 @@
+from types import CoroutineType
 from typing import Callable, Tuple
 
 from src.infrastructure.config import Settings, TestSettings, settings, test_settings
+from src.infrastructure.downloader import download_to_tempfile
+from src.infrastructure.rabbit_consumer import RabbitHandler
 from src.services.parser_service import ParserService
 from src.services.db_service import DatabaseService
-from src.infrastructure.downloader import download_to_tempfile
+from src.services.consumer_service import BrokerServicesDTO
 
 
 # Default implementations of injection
@@ -23,8 +26,6 @@ def get_downloader() -> Callable[[str, int], Tuple[str, int, int]]:
     """
     return download_to_tempfile
 
-# TODO: Make dependency injection for AMQP consumer
-
 def get_parser_service() -> ParserService:
     """Provide parser service as a dependency."""
     return ParserService()
@@ -37,3 +38,22 @@ def get_db_service() -> DatabaseService:
         settings (Settings): Configuration settings with env variables
     """
     return DatabaseService(get_settings())
+
+def get_broker_dto() -> BrokerServicesDTO:
+    """
+    Provide dto with service dependencies for broker handlers
+    """
+    contract = BrokerServicesDTO(
+        downloader=get_downloader(),
+        parser=get_parser_service(),
+        db=get_db_service()
+    )
+
+    return contract
+
+def get_broker_consumer() -> CoroutineType[None, None, None]:
+    """
+    Provide an asynchronous consumer to read messages from the queue.
+    """
+    handler = RabbitHandler(get_broker_dto(), get_settings())
+    return handler.run_consumer()
