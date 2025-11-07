@@ -44,3 +44,4 @@ class TestSettings(Settings):
 
 
 settings = Settings()
+test_settings = TestSettings()
