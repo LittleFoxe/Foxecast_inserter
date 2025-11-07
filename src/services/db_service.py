@@ -3,15 +3,22 @@ from typing import Iterable, List, Tuple
 
 from clickhouse_connect import get_client
 
+# DTO to use as the model with the database
 from src.domain.dto import ForecastDataDTO
-from src.infrastructure.config import settings
+# Contract between the infrastructure layer and this service
+from src.infrastructure.config import Settings
 
 
 class DatabaseService:
     """Handles batch inserts into ClickHouse with simple file_name uniqueness check."""
 
-    def __init__(self) -> None:
-        """Initializes the DatabaseService with a ClickHouse client using configuration from settings module."""
+    def __init__(self, settings: Settings) -> None:
+        """
+        Initializes the DatabaseService with a ClickHouse client using configuration from settings module.
+        
+        Args:
+            settings (Settings): Configuration settings with env variables
+        """
         self.client = get_client(
             host=settings.ch_host,
             port=settings.ch_port,
