@@ -64,7 +64,6 @@ def get_test_message_handler() -> Callable[[IncomingMessage], Awaitable[None]]:
         (Awaitable): function with **aio_pika.IncomingMessage** type
         argument to process the single message
     """
-    # Note that in this method get_db_service takes testing env as its main environment
     contract = BrokerServicesDTO(
         downloader=get_downloader(),
         parser=get_parser_service(),
