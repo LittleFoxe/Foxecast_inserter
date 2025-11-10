@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.infrastructure.service_provider import \
-    get_downloader, get_testing_settings, get_db_service
+    get_downloader, get_test_message_handler, get_testing_settings, get_db_service
 
 
 client = TestClient(app)
@@ -200,8 +200,7 @@ def test_4_overall_integration(monkeypatch):
     """
     import asyncio
     import json
-    from src.infrastructure.rabbit_consumer import RabbitHandler
-    from src.infrastructure.service_provider import get_db_service, get_broker_dto
+    from src.infrastructure.service_provider import get_db_service
 
     # Overriding dependencies for testing
     monkeypatch.setattr("src.infrastructure.service_provider.get_settings", get_testing_settings)
@@ -215,7 +214,7 @@ def test_4_overall_integration(monkeypatch):
     # 1) Simulate AMQP message handling with test URL
     # (it should be used instead of sending to the real queue,
     # because it might break the logic of the actually running app)
-    class FakeIncomingMessage:
+    class FakeIncomingMessage():
         def __init__(self, body: bytes):
             self.body = body
 
@@ -236,9 +235,9 @@ def test_4_overall_integration(monkeypatch):
         msg = FakeIncomingMessage(json.dumps(payload).encode("utf-8"))
 
         # We should use the handler directly to avoid creating 
-        # real consumer by service_provider
-        handler = RabbitHandler(get_broker_dto(), settings)
-        await handler._handle_message(msg)
+        # real consumer by get_broker_consumer()
+        handle = get_test_message_handler()
+        await handle(msg)
 
     asyncio.run(_run_handler_once())
 
