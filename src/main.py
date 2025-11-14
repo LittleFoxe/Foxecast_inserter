@@ -25,7 +25,7 @@ def create_app() -> FastAPI:
     """
     Create and configure FastAPI application.
     """
-    app = FastAPI(title="Forecast Inserter", version="0.2.0")
+    app = FastAPI(title="Forecast Inserter", version="1.0.0")
 
     # Health and insert endpoints
     app.include_router(http_router)
