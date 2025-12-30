@@ -1,8 +1,7 @@
-# Change the host variables to static IP or 0.0.0.0
-# if you are running pytest outside of the Docker cluster
+# You can change the hosts to localhost or some other IP if needed
 
 # Clickhouse parameters
-CH_HOST=clickhouse
+CH_HOST=0.0.0.0
 CH_PORT=8123
 # Change the username and password according to Clickhouse image
 # (if the user doesn't have the rights to insert data,
@@ -13,14 +12,14 @@ CH_DATABASE=forecast_main
 
 # RabbitMQ parameters
 # Change the username and password according to RabbitMQ image
-RABBITMQ_URL=amqp://username:password@rabbitmq:5672/
+RABBITMQ_URL=amqp://username:password@0.0.0.0:5672/
 RABBITMQ_QUEUE=forecast_exchange
 RABBITMQ_PREFETCH=2
 
 # Testing parameters
 CH_TEST_DB=forecast_test
 # Change the URL to your S3 image
-URL_TEST=http://minio:9100/forecast-data/sample.grib2 
+URL_TEST=http://0.0.0.0:9100/forecast-data/sample.grib2 
 
 # General settings
 DOWNLOAD_TIMEOUT_SECONDS=300
