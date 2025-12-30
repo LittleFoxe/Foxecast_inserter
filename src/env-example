@@ -1,18 +1,23 @@
 # Clickhouse parameter
 CH_HOST=clickhouse
 CH_PORT=8123
+# Change the username and password according to Clickhouse image
+# (if the user doesn't have the rights to insert data,
+# change the user or grant it rights to insert to and select from tables)
 CH_USER=user
 CH_PASSWORD=password
 CH_DATABASE=forecast_main
 
 # RabbitMQ parameters
-RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-RABBITMQ_QUEUE=forecast_files
+# Change the username and password according to RabbitMQ image
+RABBITMQ_URL=amqp://username:password@rabbitmq:5672/
+RABBITMQ_QUEUE=forecast_exchange
 RABBITMQ_PREFETCH=2
 
 # Testing parameters
 CH_TEST_DB=forecast_test
-URL_TEST=http://localhost:8001/forecast-test/sample.grib2
+# Change the URL to your S3 image
+URL_TEST=http://minio:9100/forecast-test/sample.grib2 
 
 # General settings
 DOWNLOAD_TIMEOUT_SECONDS=300
