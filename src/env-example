@@ -1,5 +1,5 @@
 # Clickhouse parameter
-CH_HOST=0.0.0.0
+CH_HOST=clickhouse
 CH_PORT=8123
 CH_USER=user
 CH_PASSWORD=password
