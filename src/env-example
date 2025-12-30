@@ -1,4 +1,7 @@
-# Clickhouse parameter
+# Change the host variables to static IP or 0.0.0.0
+# if you are running pytest outside of the Docker cluster
+
+# Clickhouse parameters
 CH_HOST=clickhouse
 CH_PORT=8123
 # Change the username and password according to Clickhouse image
@@ -17,7 +20,7 @@ RABBITMQ_PREFETCH=2
 # Testing parameters
 CH_TEST_DB=forecast_test
 # Change the URL to your S3 image
-URL_TEST=http://minio:9100/forecast-test/sample.grib2 
+URL_TEST=http://minio:9100/forecast-data/sample.grib2 
 
 # General settings
 DOWNLOAD_TIMEOUT_SECONDS=300
