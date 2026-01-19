@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 import numpy as np
 from eccodes import (
@@ -38,17 +38,17 @@ class BufrParser:
                     try:
                         year = codes_get(bufr_id, "typicalYear")
                     except:
-                        year = datetime.utcnow().year
+                        year = datetime.now(timezone.utc).year
                     
                     try:
                         month = codes_get(bufr_id, "typicalMonth")
                     except:
-                        month = datetime.utcnow().month
+                        month = datetime.now(timezone.utc).month
                     
                     try:
                         day = codes_get(bufr_id, "typicalDay")
                     except:
-                        day = datetime.utcnow().day
+                        day = datetime.now(timezone.utc).day
                     
                     try:
                         hour = codes_get(bufr_id, "typicalHour")

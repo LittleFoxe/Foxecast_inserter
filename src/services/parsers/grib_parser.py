@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 import numpy as np
 import xarray as xr
@@ -80,7 +80,7 @@ class GribParser:
                 hh = int(t // 100) if t >= 100 else t
                 forecast_date = datetime(yyyy, mm, dd, hh)
             except Exception:
-                forecast_date = datetime.utcnow()
+                forecast_date = datetime.now(timezone.utc)
 
             # Forecast step
             step = a.get("GRIB_step") or a.get("GRIB_forecastTime") or a.get("GRIB_stepRange")
