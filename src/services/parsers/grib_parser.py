@@ -73,6 +73,7 @@ class GribParser:
             data_date = a.get("GRIB_dataDate") or ds.attrs.get("GRIB_dataDate")
             data_time = a.get("GRIB_dataTime") or ds.attrs.get("GRIB_dataTime")
             try:
+                # Basic validating from GRIB fields
                 yyyy = int(str(data_date)[0:4])
                 mm = int(str(data_date)[4:6])
                 dd = int(str(data_date)[6:8])
@@ -80,10 +81,34 @@ class GribParser:
                 hh = int(t // 100) if t >= 100 else t
                 forecast_date = datetime(yyyy, mm, dd, hh)
             except Exception:
-                forecast_date = datetime.now(timezone.utc)
+                try:
+                    # Fallback to direct aquisition
+                    init_time =  str(da.time.data)
+                    forecast_date = datetime.strptime(init_time, "%Y-%m-%dT%H:%M:%S.%f000")
+                except Exception:
+                    forecast_date = datetime.now(timezone.utc)
 
             # Forecast step
             step = a.get("GRIB_step") or a.get("GRIB_forecastTime") or a.get("GRIB_stepRange")
+
+            # If step is still None, we get the hours directly from valid_time
+            if step == None:
+                try:
+                    # Getting the valid_time from GRIB-file
+                    valid_time = str(da.valid_time.data)
+                    # Convert to datetime from forecast_date+step
+                    date_with_step = datetime.strptime(valid_time, "%Y-%m-%dT%H:%M:%S.%f000")
+
+                    # Calculating step from timedelta
+                    delta = date_with_step - forecast_date  # getting the delta itself
+                    hours_from_days = delta.days * 24  # calculating from whole days
+                    hours_from_seconds = delta.seconds / 3600  # calculating from the remaining seconds
+                    
+                    step = int(hours_from_days + hours_from_seconds)
+                except Exception as e:
+                    print(e)
+                    step = None
+
             forecast_hour = 0
             if isinstance(step, str) and "-" in step:
                 try:
