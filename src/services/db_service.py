@@ -63,7 +63,7 @@ class DatabaseService:
         Returns:
             bool: True if file_name exists in the table (file has been ingested), False otherwise
         """
-        if self._closed or self.client == None:
+        if self._closed or self.client is None:
             raise RuntimeError("Connection to ClickHouse is closed")
 
         query = "SELECT count() FROM forecast_data WHERE file_name = %(file_name)s LIMIT 1"
@@ -89,7 +89,7 @@ class DatabaseService:
         Note:
             Will return (0, time) if file_name already exists in the table
         """
-        if self._closed or self.client == None:
+        if self._closed or self.client is None:
             raise RuntimeError("Connection to ClickHouse is closed")
 
         start = time.perf_counter()
@@ -156,7 +156,7 @@ class DatabaseService:
 
         Executes a TRUNCATE TABLE query which removes all records but preserves table structure.
         """
-        if self._closed or self.client == None:
+        if self._closed or self.client is None:
             raise RuntimeError("Connection to ClickHouse is closed")
             
         self.client.query("TRUNCATE TABLE forecast_data")

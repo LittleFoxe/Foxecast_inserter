@@ -92,7 +92,7 @@ class GribParser:
             step = a.get("GRIB_step") or a.get("GRIB_forecastTime") or a.get("GRIB_stepRange")
 
             # If step is still None, we get the hours directly from valid_time
-            if step == None:
+            if step is None:
                 try:
                     # Getting the valid_time from GRIB-file
                     valid_time = str(da.valid_time.data)

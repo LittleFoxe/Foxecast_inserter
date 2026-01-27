@@ -37,22 +37,22 @@ class BufrParser:
                     # Using get methods with defaults if keys are missing
                     try:
                         year = codes_get(bufr_id, "typicalYear")
-                    except:
+                    except Exception:
                         year = datetime.now(timezone.utc).year
                     
                     try:
                         month = codes_get(bufr_id, "typicalMonth")
-                    except:
+                    except Exception:
                         month = datetime.now(timezone.utc).month
                     
                     try:
                         day = codes_get(bufr_id, "typicalDay")
-                    except:
+                    except Exception:
                         day = datetime.now(timezone.utc).day
                     
                     try:
                         hour = codes_get(bufr_id, "typicalHour")
-                    except:
+                    except Exception:
                         hour = 0
                     
                     forecast_date = datetime(year, month, day, hour)
@@ -61,12 +61,12 @@ class BufrParser:
                     # Extract coordinate data
                     try:
                         lats = np.array(codes_get_array(bufr_id, "latitude"), dtype=float)
-                    except:
+                    except Exception:
                         lats = np.array([], dtype=float)
                     
                     try:
                         lons = np.array(codes_get_array(bufr_id, "longitude"), dtype=float)
-                    except:
+                    except Exception:
                         lons = np.array([], dtype=float)
 
                     # Find any numeric measurement field
@@ -81,7 +81,7 @@ class BufrParser:
                                 value = np.array(value_data, dtype=float)
                                 parameter = key
                                 break
-                        except:
+                        except Exception:
                             continue
                     
                     # Skip if no valid data found
@@ -111,7 +111,7 @@ class BufrParser:
                     # Get data source and other metadata
                     try:
                         data_category = codes_get_string(bufr_id, "dataCategory")
-                    except:
+                    except Exception:
                         data_category = "unknown"
                     
                     data_source = resolve_data_source(file_name, fallback=data_category)
