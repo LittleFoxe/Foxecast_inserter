@@ -1,6 +1,8 @@
-import pytest
-from src.services.parser_service import ParserService
 from pathlib import Path
+
+import pytest
+
+from src.services.parser_service import ParserService
 
 
 def test_parser_returns_complete_dto():

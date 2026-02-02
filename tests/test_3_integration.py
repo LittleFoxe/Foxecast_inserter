@@ -1,22 +1,24 @@
 import os
-from pathlib import Path
 import shutil
-import pytest
+from pathlib import Path
 
+import pytest
 from clickhouse_connect import get_client
 from fastapi.testclient import TestClient
 
+from src.infrastructure.service_provider import (
+    get_db_service,
+    get_downloader,
+    get_test_message_handler,
+    get_testing_settings,
+)
 from src.main import app
-from src.infrastructure.service_provider import \
-    get_downloader, get_test_message_handler, get_testing_settings, get_db_service
-
 
 client = TestClient(app)
 settings = get_testing_settings()
 
 def test_1_download_from_url(monkeypatch, tmp_path):
-    """
-    Test file download functionality from external URL.
+    """Test file download functionality from external URL.
     
     Steps:
     - Download test file from configured test URL
@@ -46,8 +48,7 @@ def test_1_download_from_url(monkeypatch, tmp_path):
         print(f"Cannot delete temp file: {e}")
 
 def test_2_insert_into_clickhouse(monkeypatch, tmp_path):
-    """
-    Test GRIB file insertion into ClickHouse using mocked file download.
+    """Test GRIB file insertion into ClickHouse using mocked file download.
     
     Steps:
     - Setup test database connection
@@ -112,8 +113,7 @@ def test_2_insert_into_clickhouse(monkeypatch, tmp_path):
     app.dependency_overrides.clear()
 
 def test_3_broker_integration():
-    """
-    Verify AMQP consumer can connect and subscribe without real broker using mocks.
+    """Verify AMQP consumer can connect and subscribe without real broker using mocks.
 
     Steps:
     - Create fake RabbitMQ connection and channel objects
@@ -127,9 +127,10 @@ def test_3_broker_integration():
     - Queue consumption starts with valid callback
     - Consumer task can be cancelled without errors
     """
-    import types
     import asyncio
+    import types
     from unittest.mock import patch
+
     from src.infrastructure.service_provider import get_broker_consumer
 
     # Simple fakes for aio-pika interfaces
@@ -190,8 +191,7 @@ def test_3_broker_integration():
     asyncio.run(_run_once_and_cancel())
 
 def test_4_overall_integration(monkeypatch):
-    """
-    Simulate end-to-end workflow via AMQP handler and HTTP POST, and assert metrics.
+    """Simulate end-to-end workflow via AMQP handler and HTTP POST, and assert metrics.
 
     - Invoke handle_message with a fake message payload to ensure it completes without exception
     - POST /insert with a local file to avoid network
@@ -200,6 +200,7 @@ def test_4_overall_integration(monkeypatch):
     """
     import asyncio
     import json
+
     from src.infrastructure.service_provider import get_db_service
 
     # Overriding dependencies for testing
@@ -214,7 +215,7 @@ def test_4_overall_integration(monkeypatch):
     # 1) Simulate AMQP message handling with test URL
     # (it should be used instead of sending to the real queue,
     # because it might break the logic of the actually running app)
-    class FakeIncomingMessage():
+    class FakeIncomingMessage:
         def __init__(self, body: bytes):
             self.body = body
 
@@ -234,7 +235,7 @@ def test_4_overall_integration(monkeypatch):
         payload = {"file": settings.url_test}
         msg = FakeIncomingMessage(json.dumps(payload).encode("utf-8"))
 
-        # We should use the handler directly to avoid creating 
+        # We should use the handler directly to avoid creating
         # real consumer by get_broker_consumer()
         handle = get_test_message_handler()
         await handle(msg)
@@ -296,4 +297,3 @@ def test_4_overall_integration(monkeypatch):
     db.clear_data()
     db.disconnect()
     app.dependency_overrides.clear()
-    

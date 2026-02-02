@@ -1,10 +1,11 @@
 import time
-from typing import Iterable, List, Tuple
+from collections.abc import Iterable
 
 from clickhouse_connect import get_client
 
 # DTO to use as the model with the database
 from src.domain.dto import ForecastDataDTO
+
 # Contract between the infrastructure layer and this service
 from src.infrastructure.config import Settings
 
@@ -13,11 +14,11 @@ class DatabaseService:
     """Handles batch inserts into ClickHouse with simple file_name uniqueness check."""
 
     def __init__(self, settings: Settings) -> None:
-        """
-        Initializes the DatabaseService with a ClickHouse client using configuration from settings module.
+        """Initializes the DatabaseService with a ClickHouse client using configuration from settings module.
         
         Args:
             settings (Settings): Configuration settings with env variables
+
         """
         self.client = get_client(
             host=settings.ch_host,
@@ -41,8 +42,7 @@ class DatabaseService:
         self.disconnect()
 
     def disconnect(self) -> None:
-        """
-        Closes the ClickHouse connection if it's still active.
+        """Closes the ClickHouse connection if it's still active.
         
         Checks the connection status and sets internal flag to prevent repeated closure attempts.
         """
@@ -52,8 +52,7 @@ class DatabaseService:
             self._closed = True
 
     def _already_ingested(self, file_name: str) -> bool:
-        """
-        Checks if a file has already been ingested into the forecast_data table.
+        """Checks if a file has already been ingested into the forecast_data table.
 
         Executes a COUNT() query with LIMIT 1 to verify existence of records with the specified file_name.
 
@@ -62,6 +61,7 @@ class DatabaseService:
 
         Returns:
             bool: True if file_name exists in the table (file has been ingested), False otherwise
+
         """
         if self._closed or self.client is None:
             raise RuntimeError("Connection to ClickHouse is closed")
@@ -70,9 +70,8 @@ class DatabaseService:
         res = self.client.query(query, parameters={"file_name": file_name})
         return int(res.result_rows[0][0]) > 0
 
-    def insert_batch(self, dtos: Iterable[ForecastDataDTO], file_name: str) -> Tuple[int, int]:
-        """
-        Inserts a batch of ForecastDataDTO records with file's name into ClickHouse
+    def insert_batch(self, dtos: Iterable[ForecastDataDTO], file_name: str) -> tuple[int, int]:
+        """Inserts a batch of ForecastDataDTO records with file's name into ClickHouse
         if the file has not already been ingested.
 
         Performs a uniqueness check before insertion and returns metrics about the operation.
@@ -88,6 +87,7 @@ class DatabaseService:
 
         Note:
             Will return (0, time) if file_name already exists in the table
+
         """
         if self._closed or self.client is None:
             raise RuntimeError("Connection to ClickHouse is closed")
@@ -97,7 +97,7 @@ class DatabaseService:
         if self._already_ingested(file_name):
             return 0, int((time.perf_counter() - start) * 1000)
 
-        rows: List[tuple] = []
+        rows: list[tuple] = []
         for d in dtos:
             rows.append(
                 (
@@ -119,7 +119,7 @@ class DatabaseService:
                     d.grid_size_lon,
                     d.values,
                     d.file_name,
-                )
+                ),
             )
 
         self.client.insert(
@@ -149,15 +149,13 @@ class DatabaseService:
 
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         return len(rows), elapsed_ms
-    
+
     def clear_data(self):
-        """
-        Clears all data from the forecast_data table.
+        """Clears all data from the forecast_data table.
 
         Executes a TRUNCATE TABLE query which removes all records but preserves table structure.
         """
         if self._closed or self.client is None:
             raise RuntimeError("Connection to ClickHouse is closed")
-            
+
         self.client.query("TRUNCATE TABLE forecast_data")
-        

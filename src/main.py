@@ -1,9 +1,10 @@
 import asyncio
+
 from fastapi import FastAPI
 
-from src.infrastructure.service_provider import get_broker_consumer
 from src.controllers.http import router as http_router
-from src.metrics.metrics import setup_metrics, metrics_router
+from src.infrastructure.service_provider import get_broker_consumer
+from src.metrics.metrics import metrics_router, setup_metrics
 
 
 async def on_startup() -> None:
@@ -22,8 +23,7 @@ async def on_shutdown() -> None:
             pass
 
 def create_app() -> FastAPI:
-    """
-    Create and configure FastAPI application.
+    """Create and configure FastAPI application.
     """
     app = FastAPI(title="Forecast Inserter", version="1.0.0")
 

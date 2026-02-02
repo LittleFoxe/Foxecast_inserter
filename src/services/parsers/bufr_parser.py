@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import List
+
 import numpy as np
 from eccodes import (
     codes_bufr_new_from_file,
-    codes_release,
-    codes_set,
     codes_get,
     codes_get_array,
-    codes_get_string  # Add this import if you need to get string values
+    codes_get_string,
+    codes_release,
+    codes_set,
 )
 
 from src.domain.dto import ForecastDataDTO
@@ -20,59 +20,59 @@ from src.infrastructure.source_resolver import resolve_data_source
 class BufrParser:
     """Parser strategy for BUFR files using eccodes."""
 
-    def parse(self, local_path: str, file_name: str) -> List[ForecastDataDTO]:
-        dtos: List[ForecastDataDTO] = []
+    def parse(self, local_path: str, file_name: str) -> list[ForecastDataDTO]:
+        dtos: list[ForecastDataDTO] = []
 
         with open(local_path, "rb") as f:
             while True:
                 bufr_id = codes_bufr_new_from_file(f)
                 if bufr_id is None:
                     break
-                
+
                 try:
                     # Unpack the BUFR message data
                     codes_set(bufr_id, "unpack", 1)
-                    
+
                     # Extract time information using individual keys
                     # Using get methods with defaults if keys are missing
                     try:
                         year = codes_get(bufr_id, "typicalYear")
-                    except Exception:
+                    except Exception as e:
                         year = datetime.now(timezone.utc).year
-                    
+
                     try:
                         month = codes_get(bufr_id, "typicalMonth")
-                    except Exception:
+                    except Exception as e:
                         month = datetime.now(timezone.utc).month
-                    
+
                     try:
                         day = codes_get(bufr_id, "typicalDay")
-                    except Exception:
+                    except Exception as e:
                         day = datetime.now(timezone.utc).day
-                    
+
                     try:
                         hour = codes_get(bufr_id, "typicalHour")
-                    except Exception:
+                    except Exception as e:
                         hour = 0
-                    
+
                     forecast_date = datetime(year, month, day, hour)
                     forecast_hour = 0
 
                     # Extract coordinate data
                     try:
                         lats = np.array(codes_get_array(bufr_id, "latitude"), dtype=float)
-                    except Exception:
+                    except Exception as e:
                         lats = np.array([], dtype=float)
-                    
+
                     try:
                         lons = np.array(codes_get_array(bufr_id, "longitude"), dtype=float)
-                    except Exception:
+                    except Exception as e:
                         lons = np.array([], dtype=float)
 
                     # Find any numeric measurement field
                     value = None
                     parameter = "unknown"
-                    
+
                     # Try to get various possible parameters
                     for key in ("airTemperature", "temperature", "windSpeed", "totalPrecipitation"):
                         try:
@@ -81,9 +81,9 @@ class BufrParser:
                                 value = np.array(value_data, dtype=float)
                                 parameter = key
                                 break
-                        except Exception:
+                        except Exception as e:
                             continue
-                    
+
                     # Skip if no valid data found
                     if value is None or lats.size == 0 or lons.size == 0:
                         continue
@@ -96,24 +96,31 @@ class BufrParser:
 
                     # Check if values fit grid_size_lat * grid_size_lon
                     if value.size != grid_size_lat * grid_size_lon:
-                        raise ValueError("BUFR message is not a regular grid and cannot be stored in forecast_data")
+                        raise ValueError("BUFR message is not a regular grid and \
+                                         cannot be stored in forecast_data")
 
                     # Compute bounds and steps
                     min_lat = float(unique_lats.min())
                     max_lat = float(unique_lats.max())
                     min_lon = float(unique_lons.min())
                     max_lon = float(unique_lons.max())
-                    lat_step = float(abs(np.diff(unique_lats).mean())) if grid_size_lat > 1 else 0.0
-                    lon_step = float(abs(np.diff(unique_lons).mean())) if grid_size_lon > 1 else 0.0
+                    lat_step = float(abs(np.diff(unique_lats).mean())) \
+                        if grid_size_lat > 1 \
+                        else 0.0
+                    lon_step = float(abs(np.diff(unique_lons).mean())) \
+                        if grid_size_lon > 1 \
+                        else 0.0
 
-                    values = value.reshape((grid_size_lat, grid_size_lon)).astype(np.float32).ravel(order="C").tolist()
+                    values = value.reshape(
+                        (grid_size_lat, grid_size_lon)
+                    ).astype(np.float32).ravel(order="C").tolist()
 
                     # Get data source and other metadata
                     try:
                         data_category = codes_get_string(bufr_id, "dataCategory")
-                    except Exception:
+                    except Exception as e:
                         data_category = "unknown"
-                    
+
                     data_source = resolve_data_source(file_name, fallback=data_category)
 
                     # Create DTO
