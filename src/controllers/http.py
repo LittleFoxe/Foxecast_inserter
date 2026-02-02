@@ -1,11 +1,20 @@
-from typing import Callable, Tuple
+from collections.abc import Callable
+
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, AnyUrl, Field
-from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
+from pydantic import AnyUrl, BaseModel, Field
+from starlette.status import (
+    HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+)
 
+from src.infrastructure.service_provider import (
+    get_db_service,
+    get_downloader,
+    get_parser_service,
+    get_settings,
+)
 from src.metrics.metrics import update_all_metrics
-from src.infrastructure.service_provider import get_settings, get_downloader, get_parser_service, get_db_service
-
 
 router = APIRouter()
 
@@ -17,8 +26,8 @@ class InsertRequest(BaseModel):
         ...,
         json_schema_extra={
             "example": "https://data.ecmwf.int/forecasts/{DATE}/{TIME}z/ifs/0p25/oper/{FILE}.grib2",
-            "description": "URL to GRIB2 file from ECMWF Open Data. Replace {DATE}, {TIME}, and {FILE} with actual values."
-        }
+            "description": "URL to GRIB2 file from ECMWF Open Data. Replace {DATE}, {TIME}, and {FILE} with actual values.",
+        },
     )
 
 
@@ -32,7 +41,7 @@ def health() -> dict:
 def insert(
     payload: InsertRequest,
     settings_dep = Depends(get_settings),
-    downloader: Callable[[str, int], Tuple[str, int, int]] = Depends(get_downloader),
+    downloader: Callable[[str, int], tuple[str, int, int]] = Depends(get_downloader),
     parser = Depends(get_parser_service),
     db = Depends(get_db_service),
 ) -> dict:

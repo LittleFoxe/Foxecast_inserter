@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List
+
 from pydantic import BaseModel
 
 
 class ForecastDataDTO(BaseModel):
     """DTO reflecting the `forecast_data` table schema for batch insertion."""
+
     # There is no point in creating just single domain object, because the service only inserts data into the DB
 
     id: str
@@ -25,5 +26,5 @@ class ForecastDataDTO(BaseModel):
     lat_step: float
     grid_size_lat: int
     grid_size_lon: int
-    values: List[float]
+    values: list[float]
     file_name: str

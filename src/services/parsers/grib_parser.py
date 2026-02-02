@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import List
+
 import numpy as np
 import xarray as xr
 
@@ -13,11 +13,11 @@ from src.infrastructure.source_resolver import resolve_data_source
 class GribParser:
     """Parser strategy for GRIB files using xarray+cfgrib."""
 
-    def parse(self, local_path: str, file_name: str) -> List[ForecastDataDTO]:
+    def parse(self, local_path: str, file_name: str) -> list[ForecastDataDTO]:
         # Open as multi-message dataset; allow multiple indices
         ds = xr.open_dataset(local_path, engine="cfgrib")
 
-        dtos: List[ForecastDataDTO] = []
+        dtos: list[ForecastDataDTO] = []
 
         # Iterate over variables with 2D grid (y, x) or (latitude, longitude)
         for var_name, da in ds.data_vars.items():
@@ -48,16 +48,24 @@ class GribParser:
                     max_lat = float(np.max(lat_coord))
                     min_lon = float(np.min(lon_coord))
                     max_lon = float(np.max(lon_coord))
-                    lat_step = float(abs(np.diff(lat_coord).mean())) if lat_coord.size > 1 else 0.0
-                    lon_step = float(abs(np.diff(lon_coord).mean())) if lon_coord.size > 1 else 0.0
+                    lat_step = float(abs(np.diff(lat_coord).mean())) \
+                        if lat_coord.size > 1 \
+                        else 0.0
+                    lon_step = float(abs(np.diff(lon_coord).mean())) \
+                        if lon_coord.size > 1 \
+                        else 0.0
                 else:
                     min_lat = float(np.min(lat_coord))
                     max_lat = float(np.max(lat_coord))
                     min_lon = float(np.min(lon_coord))
                     max_lon = float(np.max(lon_coord))
                     # Approximate step from first row/col
-                    lat_step = float(abs(np.diff(lat_coord[:, 0]).mean())) if lat_coord.shape[0] > 1 else 0.0
-                    lon_step = float(abs(np.diff(lon_coord[0, :]).mean())) if lon_coord.shape[1] > 1 else 0.0
+                    lat_step = float(abs(np.diff(lat_coord[:, 0]).mean())) \
+                        if lat_coord.shape[0] > 1 \
+                        else 0.0
+                    lon_step = float(abs(np.diff(lon_coord[0, :]).mean())) \
+                        if lon_coord.shape[1] > 1 \
+                        else 0.0
             else:
                 # Fallback to GRIB attributes (cfgrib exposes as GRIB_*)
                 a = da.attrs
@@ -65,35 +73,74 @@ class GribParser:
                 max_lon = float(a.get("GRIB_longitudeOfLastGridPointInDegrees", 0.0))
                 max_lat = float(a.get("GRIB_latitudeOfFirstGridPointInDegrees", 0.0))
                 min_lat = float(a.get("GRIB_latitudeOfLastGridPointInDegrees", 0.0))
-                lon_step = float(a.get("GRIB_iDirectionIncrementInDegrees", a.get("GRIB_DxInDegrees", 0.0)) or 0.0)
-                lat_step = float(a.get("GRIB_jDirectionIncrementInDegrees", a.get("GRIB_DyInDegrees", 0.0)) or 0.0)
+                lon_step = float(
+                    a.get("GRIB_iDirectionIncrementInDegrees", 
+                    a.get("GRIB_DxInDegrees", 0.0)) or 0.0
+                )
+                lat_step = float(
+                    a.get("GRIB_jDirectionIncrementInDegrees",
+                    a.get("GRIB_DyInDegrees", 0.0)) or 0.0
+                )
 
             # Time
             a = da.attrs
             data_date = a.get("GRIB_dataDate") or ds.attrs.get("GRIB_dataDate")
             data_time = a.get("GRIB_dataTime") or ds.attrs.get("GRIB_dataTime")
             try:
+                # Constant for hour conversion
+                HOUR_CONST = 100
+                # Basic validating from GRIB fields
                 yyyy = int(str(data_date)[0:4])
                 mm = int(str(data_date)[4:6])
                 dd = int(str(data_date)[6:8])
                 t = int(data_time) if data_time is not None else 0
-                hh = int(t // 100) if t >= 100 else t
+                hh = int(t // HOUR_CONST) if t >= HOUR_CONST else t
                 forecast_date = datetime(yyyy, mm, dd, hh)
-            except Exception:
-                forecast_date = datetime.now(timezone.utc)
+            except Exception as e:
+                try:
+                    # Fallback to direct aquisition
+                    init_time =  str(da.time.data)
+                    forecast_date = datetime.strptime(
+                        init_time,
+                        "%Y-%m-%dT%H:%M:%S.%f000"
+                    )
+                except Exception as e:
+                    forecast_date = datetime.now(timezone.utc)
 
             # Forecast step
             step = a.get("GRIB_step") or a.get("GRIB_forecastTime") or a.get("GRIB_stepRange")
+
+            # If step is still None, we get the hours directly from valid_time
+            if step is None:
+                try:
+                    # Getting the valid_time from GRIB-file
+                    valid_time = str(da.valid_time.data)
+                    # Convert to datetime from forecast_date+step
+                    date_with_step = datetime.strptime(valid_time, "%Y-%m-%dT%H:%M:%S.%f000")
+
+                    # Calculating step from timedelta:
+
+                    # getting the delta itself
+                    delta = date_with_step - forecast_date
+                    # calculating from whole days
+                    hours_from_days = delta.days * 24
+                    # calculating from the remaining seconds
+                    hours_from_seconds = delta.seconds / 3600
+
+                    step = int(hours_from_days + hours_from_seconds)
+                except Exception as e:
+                    step = None
+
             forecast_hour = 0
             if isinstance(step, str) and "-" in step:
                 try:
                     forecast_hour = int(step.split("-")[-1])
-                except Exception:
+                except Exception as e:
                     forecast_hour = 0
             else:
                 try:
                     forecast_hour = int(step) if step is not None else 0
-                except Exception:
+                except Exception as e:
                     forecast_hour = 0
 
             # Param & units
@@ -104,11 +151,13 @@ class GribParser:
             surface_type = str(a.get("GRIB_typeOfLevel", "surface"))
             try:
                 surface_value = float(a.get("GRIB_level", 0.0))
-            except Exception:
+            except Exception as e:
                 surface_value = 0.0
 
             # Source
-            data_source = str(a.get("GRIB_centre", ds.attrs.get("GRIB_centre", "unknown")))
+            data_source = str(a.get(
+                "GRIB_centre",
+                ds.attrs.get("GRIB_centre", "unknown")))
             data_source = resolve_data_source(file_name, fallback=data_source)
 
             dto = ForecastDataDTO(

@@ -1,17 +1,22 @@
 from fastapi import APIRouter, FastAPI
-from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 from starlette.responses import Response
-
 
 metrics_router = APIRouter()
 
 # Core metrics requested
 file_download_seconds = Histogram(
-    "file_download_seconds", "Time spent downloading a file in seconds"
+    "file_download_seconds", "Time spent downloading a file in seconds",
 )
 file_size_bytes = Gauge("file_size_bytes", "Size of the processed file in bytes")
 network_bytes_total = Counter(
-    "network_bytes_total", "Total network bytes downloaded by the service"
+    "network_bytes_total", "Total network bytes downloaded by the service",
 )
 parse_seconds = Histogram("parse_seconds", "Time spent parsing a file in seconds")
 db_insert_seconds = Histogram("db_insert_seconds", "Time spent inserting batch into DB in seconds")
@@ -21,8 +26,7 @@ def update_all_metrics(
         parse_ms: int,
         db_ms: int,
         file_size: int):
-    """
-    Update all core metrics with the provided performance and size data.
+    """Update all core metrics with the provided performance and size data.
     
     This method updates the following metrics:
     - file_download_seconds: Converts download time to seconds and records it
@@ -36,6 +40,7 @@ def update_all_metrics(
         parse_ms (int): Time taken to parse the file content in milliseconds
         db_ms (int): Time taken to insert data into the database in milliseconds
         file_size (int): Size of the processed file in bytes
+
     """
     file_download_seconds.observe(download_ms / 1000.0)
     parse_seconds.observe(parse_ms / 1000.0)
@@ -49,8 +54,7 @@ def metrics() -> Response:
 
 
 def setup_metrics(app: FastAPI) -> None:
-    """
-    Basic middleware for setting up metrics.
+    """Basic middleware for setting up metrics.
     Currently it is just an empty middleware, because metrics are sending directly from endpoints
     """
     # Currently no middleware required as the endpoints will update metrics directly

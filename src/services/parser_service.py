@@ -1,9 +1,9 @@
 import os
 import time
-from typing import List, Tuple
 
 from src.domain.dto import ForecastDataDTO
-from src.services.parsers import GribParser, BufrParser
+from src.services.parsers.grib_parser import GribParser
+from src.services.parsers.bufr_parser import BufrParser
 
 
 class ParserService:
@@ -24,7 +24,7 @@ class ParserService:
                 return "bufr"
         return "unknown"
 
-    def parse_file(self, local_path: str, file_name: str) -> Tuple[List[ForecastDataDTO], int]:
+    def parse_file(self, local_path: str, file_name: str) -> tuple[list[ForecastDataDTO], int]:
         start = time.perf_counter()
 
         fmt = self._detect_format(local_path)

@@ -1,12 +1,12 @@
 import asyncio
 import json
 import logging
-from typing import Any, Dict
+from typing import Any
+
 import aio_pika
 
 from src.infrastructure.config import Settings
 from src.services.consumer_service import BrokerServicesDTO, handle_message
-
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +18,13 @@ class RabbitHandler:
         self.services = services
 
     async def _handle_message(self, message: aio_pika.IncomingMessage) -> None:
-        """
-        General message handler to download the file from message's URL,
+        """General message handler to download the file from message's URL,
         parse it and send to database
         """
         async with message.process(requeue=False):
             body = message.body.decode("utf-8")
             try:
-                payload: Dict[str, Any] = json.loads(body)
+                payload: dict[str, Any] = json.loads(body)
                 url = payload["file"]
             except Exception as exc:
                 logger.error("Invalid message: %s - error: %s", body, exc)
